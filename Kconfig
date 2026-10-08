@@ -1,0 +1,33 @@
+# Copyright (c) 2025 Golioth, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+config NCS_APPLICATION_BOOT_BANNER_STRING
+    string
+    default "Pouch BLE GATT Example"
+
+source "$ZEPHYR_BASE/Kconfig"
+
+config EXAMPLE_SYNC_PERIOD_S
+    int "Sync Period"
+    default 20
+    help
+      The time, in seconds, after a sync to wait before requesting a sync from
+      a gateway.
+
+config EXAMPLE_CREDENTIALS_DIR
+    string "Directory containing credentials"
+    default "/lfs1/credentials"
+    help
+      Directory on mounted file system containing credentials.
+
+config EXAMPLE_FW_UPDATE_COMPONENT
+    string "OTA component to use for firmware update"
+    default "ble_gatt_example"
+    help
+      Name of component in OTA manifest to use for firmware update.
+
+# This option is used only for automated tests
+config EXAMPLE_BT_AUTO_CONFIRM
+	bool
+	default y if BOARD_NRF52_BSIM_NATIVE

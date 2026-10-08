@@ -1,0 +1,21 @@
+# Zephyr / NCS build output
+build/
+twister-out*/
+.cache/
+
+# West workspace modules (SDK lives outside this app)
+modules/
+zephyr/
+bootloader/
+nrf/
+nrfxlib/
+tools/
+.west/
+
+# Editor and OS files
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db

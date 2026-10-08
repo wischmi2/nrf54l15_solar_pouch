@@ -1,0 +1,24 @@
+/*
+ * MCUboot on the custom nRF54L15 board.
+ * No 32 kHz crystal, and the DK console UART pins are PMIC I2C / INT.
+ */
+
+&uicr {
+	nfct-pins-as-gpios;
+};
+
+&nfct {
+	status = "disabled";
+};
+
+&lfxo {
+	status = "disabled";
+};
+
+&uart20 {
+	status = "disabled";
+};
+
+&uart30 {
+	status = "disabled";
+};
