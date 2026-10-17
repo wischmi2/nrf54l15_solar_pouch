@@ -245,9 +245,13 @@ int main(void)
         {
             LOG_ERR("Up, advertising is not running");
         }
+        else if (ble_peripheral_sync_requested())
+        {
+            LOG_INF("Up, requesting a gateway");
+        }
         else
         {
-            LOG_INF("Up, advertising for a gateway");
+            LOG_INF("Up, gateway request is off");
         }
     }
 }

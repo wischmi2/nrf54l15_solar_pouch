@@ -4,21 +4,37 @@ Firmware for the custom solar board: an nRF54L15 and an nPM1300, talking to Goli
 
 The detailed bring-up record, including the J-Link commands and how the device certificate was written, is in [docs/board-bringup.md](docs/board-bringup.md).
 
-The SDK is nRF Connect SDK v3.4.0. The nRF9160 DK is the SWD debugger (J-Link serial `960059301`). It is not the bootloader. MCUboot runs on the nRF54L15.
+The SDK is nRF Connect SDK v3.4.0. The solar board is programmed through an nRF9160 DK used as the SWD debugger (J-Link serial `960054289`). That DK is not the bootloader. MCUboot runs on the nRF54L15. A second nRF9160 DK (J-Link serial `960059301`) is the gateway for another Pouch client. Do not program, reset, or recover that probe.
 
 ## Current status
 
-The board has been programmed and identified over SWD. RTT works in J-Link V9.82 with the control block at `0x20002070`. The device certificate for `nrf54l15_v3_solar` is in the LittleFS storage partition, and a boot log has shown `Credentials loaded` and `Pouch initialized`.
+The image programmed on 17 Oct 2026, on J-Link `960054289` with `ERASE_NONE` and a read-back verify, is this tree. RTT works in J-Link V9.82 with the control block at `0x20002070`. The device certificate for `nrf54l15_v3_solar` is still in the LittleFS storage partition.
 
-The image last programmed, on 9 Oct 2026, advertises continuously for a gateway and uplinks the fixed sample `{"temp":22}` on `.s/sensor`. No gateway session has completed, so that sample has not reached Golioth. The nRF9160 DK gateway gets as far as the modem PPP link, then fails to finish DTLS to `coap.golioth.io:5684` (`-113`) and later fails the DNS lookup (`-101`).
-
-This source tree has moved past that programmed image. An uplink now sends one JSON object from the nPM1300 snapshot instead of `{"temp":22}`:
+Each uplink is one JSON object from the nPM1300 snapshot, path `.s/sensor`:
 
 `vbat_mv`, `soc_pct`, `ibat_ma`, `charge`, `vbus`, `usb_cc`, `source`, `aem`, `aem_window`, `vbat_rise_mv`.
 
-That change still needs a rebuild and flash before the board will send it.
+The board asks a gateway to connect for 30 seconds (`CONFIG_EXAMPLE_ADV_WINDOW_S`), then clears the sync-request flag for 120 seconds (`CONFIG_EXAMPLE_SYNC_PERIOD_S`). The first window opens at boot. After a session ends, the next request is another 120 seconds later. While the flag is clear, the gateway skips this board and can serve another one. Advertising stays at 100–150 ms in both phases, and `main` still prints a line every 10 seconds, so this draws more than the panel can harvest. The panel is about 0.1 mA.
 
-The radio is in a debug configuration. It advertises every 100–150 ms with the gateway-request flag left on, and `main` prints a line every 10 seconds. That draws more than the panel can harvest. The panel is about 0.1 mA. The low-power window (30 seconds of advertising, then 10 minutes idle) is still described in `Kconfig` and is not what `src/ble_peripheral.c` does right now.
+No gateway session has completed. The nRF9160 DK gateway gets as far as the modem PPP link, then fails to finish DTLS to `coap.golioth.io:5684` (`-113`) and later fails the DNS lookup (`-101`).
+
+## Changelog
+
+### 17 Oct 2026 — share the gateway
+
+- Request a gateway for 30 seconds, then leave the sync-request flag clear for 2 minutes so another Pouch board can be chosen.
+- Heartbeat reports `requesting a gateway` or `gateway request is off`.
+- Built and flashed to the solar board on J-Link `960054289`. Credentials were left in place.
+
+### 17 Oct 2026 — bring-up record and debug radio
+
+- Added this README and `docs/board-bringup.md`.
+- Replaced the fixed `{"temp":22}` uplink with the nPM1300 snapshot in `src/solar_status.c`.
+- Left the radio advertising continuously, with the gateway-request flag held on, so a session could be watched on RTT. That image is what kept the other board from connecting.
+
+### 8 Oct 2026 — initial firmware
+
+- nRF54L15 application with MCUboot, Pouch over BLE GATT, device credentials read from LittleFS, and the nPM1300 board overlay.
 
 ## What has been done
 
@@ -32,7 +48,7 @@ The radio is in a debug configuration. It advertises every 100–150 ms with the
 
 ## Gateway
 
-The gateway is not this firmware. On the nRF9160 DK it is two images: the gateway on the nRF52840 and the serial modem on the nRF9160. Using that DK as the gateway means it is no longer the debugger for the solar board, so the solar board's RTT log goes away. A completed session would show the uplink in Golioth on the `nrf54l15_v3_solar` device. The DK's own cloud connection is not up yet.
+The gateway is not this firmware. On the nRF9160 DK it is two images: the gateway on the nRF52840 and the serial modem on the nRF9160. The solar board's RTT stays on its own debugger (`960054289`). A completed session would show the uplink in Golioth on the `nrf54l15_v3_solar` device. The DK's own cloud connection is not up yet.
 
 ## Building
 
@@ -40,4 +56,4 @@ The gateway is not this firmware. On the nRF9160 DK it is two images: the gatewa
 nrfutil sdk-manager toolchain launch --ncs-version v3.4.0 --chdir C:\ncs\pouch-ncs -- west build -b nrf54l15dk/nrf54l15/cpuapp -d C:\Users\Brian\pouch_nrf54l15_v3\build C:\Users\Brian\pouch_nrf54l15_v3
 ```
 
-Close J-Link RTT Viewer before programming. The certificate files `*.crt.der` and `*.key.der` are gitignored. Do not commit them, and do not chip-erase or recover the board if those files should stay on the device.
+Close J-Link RTT Viewer before programming. Program only serial `960054289`. The certificate files `*.crt.der` and `*.key.der` are gitignored. Do not commit them, and do not chip-erase or recover the board if those files should stay on the device.

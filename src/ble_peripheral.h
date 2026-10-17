@@ -25,6 +25,9 @@ void ble_peripheral_request_gateway(bool request);
 int ble_peripheral_init(void);
 
 /**
- * Start Bluetooth advertising.
+ * Start Bluetooth advertising and open one gateway-request window.
  */
 int ble_peripheral_start(void);
+
+/** True while this board is asking a gateway to connect. */
+bool ble_peripheral_sync_requested(void);

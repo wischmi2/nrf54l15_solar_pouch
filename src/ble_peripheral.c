@@ -27,26 +27,90 @@ static struct bt_data ad[] = {
     BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1),
 };
 
-/* Debug session: 100–150 ms, and the gateway request stays set.
- * This keeps the radio on. It will draw more than the panel can harvest.
- */
+/* 100–150 ms so a gateway finds the board quickly during the request window. */
 static const struct bt_le_adv_param adv_param = BT_LE_ADV_PARAM_INIT(BT_LE_ADV_OPT_CONN,
                                                                       BT_GAP_ADV_FAST_INT_MIN_2,
                                                                       BT_GAP_ADV_FAST_INT_MAX_2,
                                                                       NULL);
 
-static void resume_advertising(struct k_work *work)
+static bool sync_requested;
+
+static void sync_window_stop(struct k_work *work);
+static void sync_window_start(struct k_work *work);
+
+K_WORK_DELAYABLE_DEFINE(sync_window_stop_work, sync_window_stop);
+K_WORK_DELAYABLE_DEFINE(sync_request_work, sync_window_start);
+
+static void schedule_next_sync(void)
+{
+    (void) k_work_schedule(&sync_request_work, K_SECONDS(CONFIG_EXAMPLE_SYNC_PERIOD_S));
+}
+
+/* Advertise, with or without the flag the gateway uses to choose a device. */
+static int advertise(bool request)
+{
+    int err;
+
+    pouch_gatt_adv_req_sync(&service_data, request);
+
+    err = bt_le_adv_start(&adv_param, ad, ARRAY_SIZE(ad), NULL, 0);
+    if (err == -EALREADY)
+    {
+        err = bt_le_adv_update_data(ad, ARRAY_SIZE(ad), NULL, 0);
+    }
+    if (err == 0)
+    {
+        sync_requested = request;
+    }
+
+    return err;
+}
+
+static void sync_window_stop(struct k_work *work)
 {
     ARG_UNUSED(work);
 
-    int err = ble_peripheral_start();
+    if (default_conn)
+    {
+        return;
+    }
+
+    int err = advertise(false);
+
     if (err)
     {
-        LOG_ERR("Failed to resume advertising (err %d)", err);
+        LOG_ERR("Failed to clear gateway request (err %d)", err);
     }
+    else
+    {
+        LOG_INF("Gateway request off for %d s", CONFIG_EXAMPLE_SYNC_PERIOD_S);
+    }
+
+    schedule_next_sync();
 }
 
-K_WORK_DEFINE(resume_work, resume_advertising);
+static void sync_window_start(struct k_work *work)
+{
+    ARG_UNUSED(work);
+
+    int err = advertise(true);
+
+    if (err)
+    {
+        LOG_ERR("Failed to request a gateway (err %d)", err);
+        schedule_next_sync();
+        return;
+    }
+
+    LOG_INF("Requesting a gateway for %d s", CONFIG_EXAMPLE_ADV_WINDOW_S);
+    (void) k_work_schedule(&sync_window_stop_work, K_SECONDS(CONFIG_EXAMPLE_ADV_WINDOW_S));
+}
+
+int ble_peripheral_start(void)
+{
+    sync_window_start(NULL);
+    return sync_requested ? 0 : -EIO;
+}
 
 static void connected(struct bt_conn *conn, uint8_t err)
 {
@@ -58,14 +122,25 @@ static void connected(struct bt_conn *conn, uint8_t err)
 
     LOG_INF("Gateway connected");
     default_conn = conn;
+    (void) k_work_cancel_delayable(&sync_window_stop_work);
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
-    LOG_INF("Disconnected (reason 0x%02x), advertising again", reason);
-
     default_conn = NULL;
-    k_work_submit(&resume_work);
+    (void) k_work_cancel_delayable(&sync_window_stop_work);
+
+    int err = advertise(false);
+
+    if (err)
+    {
+        LOG_ERR("Failed to resume advertising (err %d)", err);
+    }
+
+    LOG_INF("Disconnected (reason 0x%02x), next gateway request in %d s",
+            reason,
+            CONFIG_EXAMPLE_SYNC_PERIOD_S);
+    schedule_next_sync();
 }
 
 BT_CONN_CB_DEFINE(conn_callbacks) = {
@@ -121,7 +196,13 @@ static struct bt_conn_auth_cb auth_cb_display = {
 void ble_peripheral_request_gateway(bool request)
 {
     pouch_gatt_adv_req_sync(&service_data, request);
+    sync_requested = request;
     bt_le_adv_update_data(ad, ARRAY_SIZE(ad), NULL, 0);
+}
+
+bool ble_peripheral_sync_requested(void)
+{
+    return sync_requested;
 }
 
 void ble_peripheral_button_handler(void)
@@ -153,20 +234,5 @@ int ble_peripheral_init(void)
         return err;
     }
 
-    return 0;
-}
-
-int ble_peripheral_start(void)
-{
-    int err;
-
-    pouch_gatt_adv_req_sync(&service_data, true);
-    err = bt_le_adv_start(&adv_param, ad, ARRAY_SIZE(ad), NULL, 0);
-    if (err && err != -EALREADY)
-    {
-        return err;
-    }
-
-    LOG_INF("Advertising, requesting a gateway");
     return 0;
 }
