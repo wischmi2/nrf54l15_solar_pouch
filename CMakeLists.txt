@@ -13,4 +13,5 @@ target_sources(app PRIVATE
   src/fatal_error.c
   src/fw_update.c
   src/ble_peripheral.c
+  src/solar_status.c
 )

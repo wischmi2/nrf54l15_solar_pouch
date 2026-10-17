@@ -12,6 +12,10 @@ nrfxlib/
 tools/
 .west/
 
+# Device certificate and private key. These are programmed into LittleFS.
+*.crt.der
+*.key.der
+
 # Editor and OS files
 .vscode/
 .idea/

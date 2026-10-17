@@ -168,22 +168,66 @@
 		};
 
 		/*
-		 * nPM1300 LED driver. This registers ONE Zephyr LED device
-		 * (nodelabel npm1300_leds); the three LEDs are addressed by index
-		 * 0/1/2 through the LED API (e.g. led_on(dev, 0)). There are no
-		 * child nodes.
+		 * nPM1300 LED drivers sink about 5 mA while lit. Host mode
+		 * stays off until software turns one on. Charging and error
+		 * modes would light the LED for the whole time solar is present.
 		 *
 		 * LED0 = board status LED (VSYS -> R14 -> nPM1300 pin 25).
-		 * "host": solid as a bench load; 1 Hz blink while VBAT
-		 * is rising with USB unplugged (AEM harvest).
 		 */
 		npm1300_leds: leds {
 			compatible = "nordic,npm1300-led";
 			nordic,led0-mode = "host";
-			nordic,led1-mode = "error";
+			nordic,led1-mode = "host";
 			nordic,led2-mode = "host";
 		};
 	};
+};
+
+/*
+ * DK board devices that are not on the solar board. Leaving them enabled
+ * drives pins (LED GPIO high, button pull-ups, SPI to a missing flash).
+ */
+&led0 {
+	status = "disabled";
+};
+
+&led1 {
+	status = "disabled";
+};
+
+&led2 {
+	status = "disabled";
+};
+
+&led3 {
+	status = "disabled";
+};
+
+&button0 {
+	status = "disabled";
+};
+
+&button1 {
+	status = "disabled";
+};
+
+&button2 {
+	status = "disabled";
+};
+
+&button3 {
+	status = "disabled";
+};
+
+/* DK external flash and PWM LED are not on this board. Disable the
+ * devices that would be probed, not the parent controllers they point at.
+ */
+&mx25r64 {
+	status = "disabled";
+};
+
+&pwm_led1 {
+	status = "disabled";
 };
 
 /* Pouch credentials live on LittleFS in the storage partition. */

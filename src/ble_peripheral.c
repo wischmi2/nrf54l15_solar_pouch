@@ -10,8 +10,10 @@ LOG_MODULE_REGISTER(example_ble_peripheral);
 #include "ble_peripheral.h"
 
 #include <stdio.h>
+#include <zephyr/kernel.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
+#include <zephyr/bluetooth/gap.h>
 
 #include <pouch/transport/bluetooth/gatt.h>
 
@@ -25,43 +27,42 @@ static struct bt_data ad[] = {
     BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1),
 };
 
+/* Debug session: 100–150 ms, and the gateway request stays set.
+ * This keeps the radio on. It will draw more than the panel can harvest.
+ */
+static const struct bt_le_adv_param adv_param = BT_LE_ADV_PARAM_INIT(BT_LE_ADV_OPT_CONN,
+                                                                      BT_GAP_ADV_FAST_INT_MIN_2,
+                                                                      BT_GAP_ADV_FAST_INT_MAX_2,
+                                                                      NULL);
+
+static void resume_advertising(struct k_work *work)
+{
+    ARG_UNUSED(work);
+
+    int err = ble_peripheral_start();
+    if (err)
+    {
+        LOG_ERR("Failed to resume advertising (err %d)", err);
+    }
+}
+
+K_WORK_DEFINE(resume_work, resume_advertising);
+
 static void connected(struct bt_conn *conn, uint8_t err)
 {
     if (err)
     {
-        LOG_DBG("Connection failed (err 0x%02x)", err);
+        LOG_ERR("Connection failed (err 0x%02x)", err);
         return;
     }
 
-    LOG_DBG("Connected");
+    LOG_INF("Gateway connected");
     default_conn = conn;
 }
 
-static void sync_request_work_handler(struct k_work *work)
-{
-    LOG_DBG("Requesting Gateway sync");
-    ble_peripheral_request_gateway(true);
-}
-K_WORK_DELAYABLE_DEFINE(sync_request_work, sync_request_work_handler);
-
-static void resume_advertising(struct k_work *work)
-{
-    int err = ble_peripheral_start();
-    if (err)
-    {
-        LOG_ERR("Failed to start advertising (err: %d)", err);
-        return;
-    }
-
-    // Although advertising resumes right away, we don't have to request a gateway.
-    // Schedule the gateway flag to be set at a later time:
-    k_work_schedule(&sync_request_work, K_SECONDS(CONFIG_EXAMPLE_SYNC_PERIOD_S));
-}
-K_WORK_DEFINE(resume_work, resume_advertising);
-
 static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
-    LOG_DBG("Disconnected (reason 0x%02x)", reason);
+    LOG_INF("Disconnected (reason 0x%02x), advertising again", reason);
 
     default_conn = NULL;
     k_work_submit(&resume_work);
@@ -157,6 +158,15 @@ int ble_peripheral_init(void)
 
 int ble_peripheral_start(void)
 {
-    pouch_gatt_adv_req_sync(&service_data, false);
-    return bt_le_adv_start(BT_LE_ADV_CONN_FAST_2, ad, ARRAY_SIZE(ad), NULL, 0);
+    int err;
+
+    pouch_gatt_adv_req_sync(&service_data, true);
+    err = bt_le_adv_start(&adv_param, ad, ARRAY_SIZE(ad), NULL, 0);
+    if (err && err != -EALREADY)
+    {
+        return err;
+    }
+
+    LOG_INF("Advertising, requesting a gateway");
+    return 0;
 }

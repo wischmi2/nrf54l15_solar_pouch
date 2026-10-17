@@ -1,7 +1,17 @@
 /*
  * MCUboot on the custom nRF54L15 board.
  * No 32 kHz crystal, and the DK console UART pins are PMIC I2C / INT.
+ *
+ * This file replaces MCUboot's app.overlay, so the bootloader must be
+ * pointed at boot_partition (RRAM 0x0) here. Without that, it is linked
+ * into the application slot and the CPU never leaves address 0x0.
  */
+
+/ {
+	chosen {
+		zephyr,code-partition = &boot_partition;
+	};
+};
 
 &uicr {
 	nfct-pins-as-gpios;

@@ -9,11 +9,19 @@ config NCS_APPLICATION_BOOT_BANNER_STRING
 source "$ZEPHYR_BASE/Kconfig"
 
 config EXAMPLE_SYNC_PERIOD_S
-    int "Sync Period"
-    default 20
+    int "Sync period in seconds"
+    default 600
     help
-      The time, in seconds, after a sync to wait before requesting a sync from
-      a gateway.
+      Seconds to stay idle after an advertising window or a session before
+      asking a gateway for another sync. The solar harvest is about 0.1 mA,
+      so this stays long.
+
+config EXAMPLE_ADV_WINDOW_S
+    int "Advertising window in seconds"
+    default 30
+    help
+      How long to advertise while requesting a gateway. Advertising stops
+      after this until the next sync period, so the radio is not on all the time.
 
 config EXAMPLE_CREDENTIALS_DIR
     string "Directory containing credentials"
