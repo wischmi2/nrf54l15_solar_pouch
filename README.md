@@ -14,11 +14,15 @@ Each uplink is one JSON object from the nPM1300 snapshot, path `.s/sensor`:
 
 `vbat_mv`, `soc_pct`, `ibat_ma`, `charge`, `vbus`, `usb_cc`, `source`, `aem`, `aem_window`, `vbat_rise_mv`.
 
-The board asks a gateway to connect for 30 seconds (`CONFIG_EXAMPLE_ADV_WINDOW_S`), then clears the sync-request flag for 120 seconds (`CONFIG_EXAMPLE_SYNC_PERIOD_S`). The first window opens at boot. After a session ends, the next request is another 120 seconds later. While the flag is clear, the gateway skips this board and can serve another one. Advertising stays at 100–150 ms in both phases, and `main` still prints a line every 10 seconds, so this draws more than the panel can harvest. The panel is about 0.1 mA.
+The board asks a gateway to connect for 30 seconds (`CONFIG_EXAMPLE_ADV_WINDOW_S`), then clears the sync-request flag for 300 seconds (`CONFIG_EXAMPLE_SYNC_PERIOD_S`). The first window opens at boot. After a session ends, the next request is another 5 minutes later. While the flag is clear, the gateway skips this board and can serve another one. Advertising stays at 100–150 ms in both phases, and `main` still prints a line every 10 seconds, so this draws more than the panel can harvest. The panel is about 0.1 mA.
 
 No gateway session has completed. The nRF9160 DK gateway gets as far as the modem PPP link, then fails to finish DTLS to `coap.golioth.io:5684` (`-113`) and later fails the DNS lookup (`-101`).
 
 ## Changelog
+
+### 17 Oct 2026 — upload every 5 minutes
+
+- The idle time between gateway requests is 300 seconds (`CONFIG_EXAMPLE_SYNC_PERIOD_S`). The request window stays 30 seconds.
 
 ### 17 Oct 2026 — share the gateway
 
